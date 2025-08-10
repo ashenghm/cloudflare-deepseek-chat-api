@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeepSeek Chat API 示例</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .input-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+        input, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        textarea {
+            height: 100px;
+            resize: vertical;
+        }
+        button {
+            background: #007AFF;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background: #0056CC;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .response {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 5px;
+            border-left: 4px solid #007AFF;
+        }
+        .error {
+            border-left-color: #dc3545;
+            background: #f8d7da;
+        }
+        .loading {
+            color: #666;
+        }
+        pre {
+            background: #f1f3f4;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤖 DeepSeek Chat API 测试</h1>
+        
+        <form id="chatForm">
+            <div class="input-group">
+                <label for="apiUrl">API URL:</label>
+                <input type="text" id="apiUrl" value="https://your-worker.your-subdomain.workers.dev/api/chat" placeholder="输入你的 Worker URL">
+            </div>
+            
+            <div class="input-group">
+                <label for="message">消息内容:</label>
+                <textarea id="message" placeholder="输入你想要发送的消息...">你好，请简单介绍一下你自己。</textarea>
+            </div>
+            
+            <div class="input-group">
+                <label for="model">模型:</label>
+                <input type="text" id="model" value="deepseek-chat" placeholder="deepseek-chat">
+            </div>
+            
+            <div class="input-group">
+                <label for="maxTokens">最大令牌数:</label>
+                <input type="number" id="maxTokens" value="1000" min="1" max="4000">
+            </div>
+            
+            <div class="input-group">
+                <label for="temperature">温度 (0.0-2.0):</label>
+                <input type="number" id="temperature" value="0.7" min="0" max="2" step="0.1">
+            </div>
+            
+            <div class="input-group">
+                <label>
+                    <input type="checkbox" id="stream"> 启用流式输出
+                </label>
+            </div>
+            
+            <button type="submit" id="sendBtn">发送消息</button>
+        </form>
+        
+        <div id="response"></div>
+    </div>
+
+    <script>
+        document.getElementById('chatForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const apiUrl = document.getElementById('apiUrl').value;
+            const message = document.getElementById('message').value;
+            const model = document.getElementById('model').value;
+            const maxTokens = parseInt(document.getElementById('maxTokens').value);
+            const temperature = parseFloat(document.getElementById('temperature').value);
+            const stream = document.getElementById('stream').checked;
+            
+            const sendBtn = document.getElementById('sendBtn');
+            const responseDiv = document.getElementById('response');
+            
+            sendBtn.disabled = true;
+            sendBtn.textContent = '发送中...';
+            
+            responseDiv.innerHTML = '<div class="response loading">正在发送请求...</div>';
+            
+            try {
+                const requestBody = {
+                    messages: [
+                        {
+                            role: "user",
+                            content: message
+                        }
+                    ],
+                    model: model,
+                    max_tokens: maxTokens,
+                    temperature: temperature,
+                    stream: stream
+                };
+                
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(requestBody)
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                if (stream) {
+                    // 处理流式响应
+                    const reader = response.body.getReader();
+                    responseDiv.innerHTML = '<div class="response"><strong>流式响应:</strong><br><div id="streamContent"></div></div>';
+                    const streamContent = document.getElementById('streamContent');
+                    
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+                        
+                        const chunk = new TextDecoder().decode(value);
+                        streamContent.innerHTML += chunk;
+                    }
+                } else {
+                    // 处理普通响应
+                    const data = await response.json();
+                    
+                    responseDiv.innerHTML = `
+                        <div class="response">
+                            <strong>响应:</strong><br>
+                            <p>${data.choices[0].message.content}</p>
+                            <hr>
+                            <strong>详细信息:</strong>
+                            <pre>${JSON.stringify(data, null, 2)}</pre>
+                        </div>
+                    `;
+                }
+                
+            } catch (error) {
+                responseDiv.innerHTML = `
+                    <div class="response error">
+                        <strong>错误:</strong><br>
+                        ${error.message}
+                    </div>
+                `;
+            } finally {
+                sendBtn.disabled = false;
+                sendBtn.textContent = '发送消息';
+            }
+        });
+    </script>
+</body>
+</html>
