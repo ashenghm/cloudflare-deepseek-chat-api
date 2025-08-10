@@ -14,8 +14,8 @@ ENVIRONMENT = "staging"
 
 [[kv_namespaces]]
 binding = "CHAT_HISTORY"
-preview_id = "your-preview-namespace-id"
-id = "your-production-namespace-id"
+preview_id = "dfda5db1c20f41889246e79d40ed95be"
+id = "8225fb00fd0c4b99aa33e3ba3851130e"
 
 [build]
 command = ""
